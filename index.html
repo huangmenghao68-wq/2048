@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiMjA0OCIsInNob3J0X25hbWUiOiIyMDQ4Iiwic3RhcnRfdXJsIjoiLiIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiNmYWY4ZWYiLCJ0aGVtZV9jb2xvciI6IiNmYWY4ZWYifQ==">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{background:#faf8ef;display:flex;flex-direction:column;align-items:center;padding:16px;min-height:100vh}
+#container{width:min(92vw,420px)}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+h1{font-size:42px;color:#776e65}
+.score-wrap{display:flex;gap:8px}
+.score-box{background:#bbada0;color:#eee4da;padding:6px 12px;border-radius:6px;text-align:center}
+.score-box strong{display:block;font-size:20px}
+#restart{background:#8f7a66;color:#fff;border:none;padding:8px 12px;border-radius:6px;font-size:15px}
+.grid{background:#bbada0;padding:10px;border-radius:10px;aspect-ratio:1/1}
+.grid-inner{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;height:100%}
+.cell{background:#cdc1b4;border-radius:6px}
+.tile{border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:clamp(22px,7vw,32px)}
+.tile-2{background:#eee4da;color:#776e65}
+.tile-4{background:#ede0c8;color:#776e65}
+.tile-8{background:#f2b179;color:#f9f6f2}
+.tile-16{background:#f59563;color:#f9f6f2}
+.tile-32{background:#f67c5f;color:#f9f6f2}
+.tile-64{background:#f65e3b;color:#f9f6f2}
+.tile-128{background:#edcf72;color:#f9f6f2;font-size:clamp(18px,6vw,26px)}
+.tile-256{background:#edcc61;color:#f9f6f2;font-size:clamp(18px,6vw,26px)}
+.tile-512{background:#edc850;color:#f9f6f2;font-size:clamp(18px,6vw,26px)}
+.tile-1024{background:#edc53f;color:#f9f6f2;font-size:clamp(14px,5vw,22px)}
+.tile-2048{background:#edc22e;color:#f9f6f2;font-size:clamp(14px,5vw,22px)}
+.over{position:fixed;inset:0;background:rgba(255,255,255,0.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:99}
+.over button{padding:10px 16px;border:none;border-radius:6px;background:#8f7a66;color:#fff;font-size:16px}
+.hide{display:none}
+.tip{color:#776e65;margin-top:10px;font-size:14px}
+</style>
+</head>
+<body>
+<div id="container">
+<div class="header">
+<h1>2048</h1>
+<div class="score-wrap">
+<div class="score-box">分数<strong id="score">0</strong></div>
+<div class="score-box">最高<strong id="best">0</strong></div>
+</div>
+</div>
+<button id="restart">重新开始</button>
+<div class="grid">
+<div class="grid-inner" id="grid"></div>
+</div>
+<div class="tip">✅自动存档，关闭再打开不会丢</div>
+</div>
+<div class="over hide" id="gameOver">
+<h2>游戏结束</h2>
+<button onclick="newGame()">再来一局</button>
+</div>
+<script>
+const size=4;
+let grid=[];
+let score=0;
+const STORAGE_KEY="save2048";
+const BEST_KEY="best2048";
+const gridEl=document.getElementById("grid");
+const scoreEl=document.getElementById("score");
+const bestEl=document.getElementById("best");
+const overEl=document.getElementById("gameOver");
+document.getElementById("restart").onclick=newGame;
+function getBest(){return +localStorage.getItem(BEST_KEY)||0}
+function saveBest(v){localStorage.setItem(BEST_KEY,String(v))}
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify({grid,score}))}
+function loadState(){
+const s=localStorage.getItem(STORAGE_KEY);
+if(!s)return null;
+try{return JSON.parse(s)}catch{return null}
+}
+function render(){
+gridEl.innerHTML="";
+for(let r=0;r<size;r++){
+for(let c=0;c<size;c++){
+const v=grid[r][c];
+const d=document.createElement("div");
+d.className=v?"tile tile-"+v:"cell";
+d.textContent=v||"";
+gridEl.appendChild(d);
+}
+}
+scoreEl.textContent=score;
+const b=getBest();
+bestEl.textContent=b;
+if(score>b){saveBest(score);bestEl.textContent=score}
+saveState();
+}
+function emptyCells(){
+let arr=[];
+for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])arr.push([r,c]);
+return arr;
+}
+function randAdd(){
+const e=emptyCells();
+if(!e.length)return;
+const [r,c]=e[Math.floor(Math.random()*e.length)];
+grid[r][c]=Math.random()<0.9?2:4;
+}
+function newGame(){
+overEl.classList.add("hide");
+score=0;
+grid=Array(size).fill().map(()=>Array(size).fill(0));
+randAdd();randAdd();render();
+}
+function slide(arr){
+let a=arr.filter(x=>x);
+for(let i=0;i<a.length-1;i++){if(a[i]===a[i+1]){a[i]*=2;score+=a[i];a[i+1]=0}}
+a=a.filter(x=>x);
+while(a.length<size)a.push(0);
+return a;
+}
+function moveLeft(){
+for(let r=0;r<size;r++)grid[r]=slide(grid[r]);
+}
+function moveRight(){
+for(let r=0;r<size;r++)grid[r]=slide(grid[r].reverse()).reverse();
+}
+function moveUp(){
+for(let c=0;c<size;c++){
+let col=[];for(let r=0;r<size;r++)col.push(grid[r][c]);
+col=slide(col);
+for(let r=0;r<size;r++)grid[r][c]=col[r];
+}
+}
+function moveDown(){
+for(let c=0;c<size;c++){
+let col=[];for(let r=0;r<size;r++)col.push(grid[r][c]);
+col=slide(col.reverse()).reverse();
+for(let r=0;r<size;r++)grid[r][c]=col[r];
+}
+}
+function canMove(){
+if(emptyCells().length>0)return true;
+for(let r=0;r<size;r++)for(let c=0;c<size;c++){
+const v=grid[r][c];
+if(c+1<size&&grid[r][c+1]===v)return true;
+if(r+1<size&&grid[r+1][c]===v)return true;
+}
+return false;
+}
+function handle(dir){
+const old=JSON.stringify(grid);
+if(dir==="left")moveLeft();
+else if(dir==="right")moveRight();
+else if(dir==="up")moveUp();
+else if(dir==="down")moveDown();
+if(JSON.stringify(grid)!==old){randAdd();render()}
+if(!canMove())overEl.classList.remove("hide");
+}
+let startX=0,startY=0;
+gridEl.addEventListener("touchstart",e=>{
+startX=e.touches[0].clientX;startY=e.touches[0].clientY;
+})
+gridEl.addEventListener("touchend",e=>{
+const dx=e.changedTouches[0].clientX-startX;
+const dy=e.changedTouches[0].clientY-startY;
+if(Math.abs(dx)>Math.abs(dy)){
+if(dx>30)handle("right");
+else if(dx<-30)handle("left");
+}else{
+if(dy>30)handle("down");
+else if(dy<-30)handle("up");
+}
+})
+document.addEventListener("keydown",e=>{
+if(e.key==="ArrowLeft")handle("left");
+if(e.key==="ArrowRight")handle("right");
+if(e.key==="ArrowUp")handle("up");
+if(e.key==="ArrowDown")handle("down");
+})
+const saved=loadState();
+if(saved){grid=saved.grid;score=saved.score}else{newGame()}
+render();
+</script>
+</body>
+</html>
